@@ -77,7 +77,8 @@ async def test(interaction: discord.Interaction):
                         tc=''
                     if item['displayType'][-1]=="○":
                         item['displayType'] = item['displayType'][:-1]+'速'
-                    delay_messages.append(f"{item['displayType']} {item['dest']['text']}行き {tc} {item['no']} {item['delayMinutes']}分遅れ {position}")
+                    dest_text = item['dest']['text'] if isinstance(item['dest'], dict) else item['dest']
+                    delay_messages.append(f"{item['displayType']} {dest_text}行き {tc} {item['no']} {item['delayMinutes']}分遅れ {position}")
 
             if delay_messages:
                 content += "\n".join(delay_messages)
