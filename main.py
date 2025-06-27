@@ -47,6 +47,7 @@ async def test(interaction: discord.Interaction):
         linename.append(line["name"])
         linerange.append(line["range"])
 
+    all_responses = []
     for i in range(len(linelist)):
         try:
             line=linelist[i]
@@ -79,15 +80,18 @@ async def test(interaction: discord.Interaction):
                     delay_messages.append(f"{item['displayType']} {item['dest']['text']}行き {tc} {item['no']} {item['delayMinutes']}分遅れ {position}")
 
             if delay_messages:
-                content = "\n".join(delay_messages)
+                content += "\n".join(delay_messages)
             else:
-                content = "現在、遅延情報はありません。"
-            await interaction.response.send_message(content)
+                content += "現在、遅延情報はありません。"
+            all_responses.append(content)
 
         except RequestException as err:
-            await interaction.response.send_message(f'HTTPError: {err}')
+            all_responses.append(f'HTTPError: {err}')
         except json.JSONDecodeError as err:
-            await interaction.response.send_message(f'JSONDecodeError: {err}')
+            all_responses.append(f'JSONDecodeError: {err}')
+    
+    final_response = "\n\n".join(all_responses)
+    await interaction.response.send_message(final_response)
 
 
 bot.run(token=token)
