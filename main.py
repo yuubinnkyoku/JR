@@ -32,44 +32,62 @@ async def on_ready():
     # スラッシュコマンドを同期
     await bot.tree.sync()
 
-
 @bot.tree.command(name="jr_west_delay", description="JR西日本の遅延情報を取得します。")
 async def test(interaction: discord.Interaction):
-    try:
-        url = 'https://www.train-guide.westjr.co.jp/api/v3/kobesanyo.json'
-        url_st = url.replace('.json','_st.json')
-        res = requests.get(url)
-        res_st = requests.get(url_st)
-        res.raise_for_status()
-        res_st.raise_for_status()
-        data = res.json()
-        data_st = res_st.json()
+    url="https://www.train-guide.westjr.co.jp/api/v3/area_kinki_master.json"
+    res = requests.get(url)
+    linedata = res.json()
+    lines = linedata['lines']
 
-        dictst = {station['info']['code']: station['info']['name'] for station in data_st['stations']}
+    linelist=[]
+    linename=[]
+    linerange=[]
+    for line in lines.values():
+        linelist.append(line["pos"])
+        linename.append(line["name"])
+        linerange.append(line["range"])
 
-        delay_messages = []
-        for item in data['trains']:
-            if item['delayMinutes'] > 0:
-                stn = item['pos'].split('_')
-                try:
-                    position = dictst[stn[0]] + '辺り'
-                except KeyError:
-                    position = "どこかよくわかんない"
-                tc=item['typeChange']
-                if tc == " ":
-                    tc=''
-                delay_messages.append(f"{item['displayType']} {item['dest']['text']}行き {tc} {item['no']} {item['delayMinutes']}分遅れ {position}")
+    for i in range(len(linelist)):
+        try:
+            line=linelist[i]
+            content=""
+            content += f"**{linename[i]}({linerange[i]})**\n"
+            url = f'https://www.train-guide.westjr.co.jp{line}'
+            url_st = url.replace('.json','_st.json')
+            res = requests.get(url)
+            res_st = requests.get(url_st)
+            res.raise_for_status()
+            res_st.raise_for_status()
+            data = res.json()
+            data_st = res_st.json()
 
-        if delay_messages:
-            content = "\n".join(delay_messages)
-        else:
-            content = "現在、遅延情報はありません。"
-        await interaction.response.send_message(content)
+            dictst = {station['info']['code']: station['info']['name'] for station in data_st['stations']}
 
-    except RequestException as err:
-        await interaction.response.send_message(f'HTTPError: {err}')
-    except json.JSONDecodeError as err:
-        await interaction.response.send_message(f'JSONDecodeError: {err}')
+            delay_messages = []
+            for item in data['trains']:
+                if item['delayMinutes'] > 0:
+                    stn = item['pos'].split('_')
+                    try:
+                        position = dictst[stn[0]] + '辺り'
+                    except KeyError:
+                        position = "どこかよくわかんない"
+                    tc=item['typeChange']
+                    if tc == " ":
+                        tc=''
+                    if item['displayType'][-1]=="○":
+                        item['displayType'] = item['displayType'][:-1]+'速'
+                    delay_messages.append(f"{item['displayType']} {item['dest']['text']}行き {tc} {item['no']} {item['delayMinutes']}分遅れ {position}")
+
+            if delay_messages:
+                content = "\n".join(delay_messages)
+            else:
+                content = "現在、遅延情報はありません。"
+            await interaction.response.send_message(content)
+
+        except RequestException as err:
+            await interaction.response.send_message(f'HTTPError: {err}')
+        except json.JSONDecodeError as err:
+            await interaction.response.send_message(f'JSONDecodeError: {err}')
 
 
 bot.run(token=token)
