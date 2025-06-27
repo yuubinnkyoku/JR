@@ -72,7 +72,7 @@ async def test(interaction: discord.Interaction):
                         position = dictst[stn[0]] + '辺り'
                     except KeyError:
                         position = "どこかよくわかんない"
-                    tc=item['typeChange']
+                    tc=item.get('typeChange', '')
                     if tc == " ":
                         tc=''
                     if item['displayType'][-1]=="○":
