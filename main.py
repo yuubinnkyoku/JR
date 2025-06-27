@@ -92,6 +92,8 @@ async def test(interaction: discord.Interaction):
             all_responses.append(f'JSONDecodeError: {err}')
     
     final_response = "\n\n".join(all_responses)
+    if len(final_response) > 2000:
+        final_response = final_response[:1997] + "..."
     await interaction.response.send_message(final_response)
 
 
