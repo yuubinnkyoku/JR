@@ -1,7 +1,9 @@
 import traceback
 
 import discord
+import json
 import requests
+from requests.exceptions import RequestException
 from discord.ext import commands
 
 from env.config import Config
@@ -33,27 +35,41 @@ async def on_ready():
 
 @bot.tree.command(name="jr_west_delay", description="JR西日本の遅延情報を取得します。")
 async def test(interaction: discord.Interaction):
-    url = "https://www.train-guide.westjr.co.jp/api/v3/kobesanyo.json"
-    # GETリクエストを送信
-    response = requests.get(url)
-    # レスポンスをJSON形式で取得
-    data = response.json()
+    try:
+        url = 'https://www.train-guide.westjr.co.jp/api/v3/kobesanyo.json'
+        url_st = url.replace('.json','_st.json')
+        res = requests.get(url)
+        res_st = requests.get(url_st)
+        res.raise_for_status()
+        res_st.raise_for_status()
+        data = res.json()
+        data_st = res_st.json()
 
-    trains = data["trains"]
+        dictst = {station['info']['code']: station['info']['name'] for station in data_st['stations']}
 
-    delay_messages = []
-    for train in trains:
-        delay = train["delayMinutes"]
-        if delay != 0:
-            delay_messages.append(
-                f"{train['displayType']} {train['dest']['text']}行き {train['typeChange']} {train['no']}: {delay}分遅れ"
-            )
+        delay_messages = []
+        for item in data['trains']:
+            if item['delayMinutes'] > 0:
+                stn = item['pos'].split('_')
+                try:
+                    position = dictst[stn[0]] + '辺り'
+                except KeyError:
+                    position = "どこかよくわかんない"
+                tc=item['typeChange']
+                if tc == " ":
+                    tc=''
+                delay_messages.append(f"{item['displayType']} {item['dest']['text']}行き {tc} {item['no']} {item['delayMinutes']}分遅れ {position}")
 
-    if delay_messages:
-        content = "\n".join(delay_messages)
-    else:
-        content = "現在、遅延情報はありません。"
-    await interaction.response.send_message(content)
+        if delay_messages:
+            content = "\n".join(delay_messages)
+        else:
+            content = "現在、遅延情報はありません。"
+        await interaction.response.send_message(content)
+
+    except RequestException as err:
+        await interaction.response.send_message(f'HTTPError: {err}')
+    except json.JSONDecodeError as err:
+        await interaction.response.send_message(f'JSONDecodeError: {err}')
 
 
 bot.run(token=token)

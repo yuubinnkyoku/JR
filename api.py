@@ -1,7 +1,7 @@
 import json
 import urllib.request
 
-try
+try:
     url = 'https://www.train-guide.westjr.co.jp/api/v3/kobesanyo.json'
     url_st = url.replace('.json','_st.json')
     res = urllib.request.urlopen(url)
