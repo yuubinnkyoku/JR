@@ -270,12 +270,14 @@ name = "jr"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "certifi" },
     { name = "discord" },
     { name = "requests" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "certifi", specifier = ">=2025.6.15" },
     { name = "discord", specifier = ">=2.3.2" },
     { name = "requests", specifier = ">=2.32.4" },
 ]

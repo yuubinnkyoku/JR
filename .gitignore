@@ -8,3 +8,4 @@ wheels/
 env/config.ini
 # Virtual environments
 .venv
+*.out
