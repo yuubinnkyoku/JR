@@ -1,15 +1,20 @@
 import requests
 import json
 from typing import Optional
+from logging import getLogger
 from env.config import Config
 from google.transit import gtfs_realtime_pb2
 
+# ロガーの設定
+logger = getLogger(__name__)
+
+# 環境変数からODPTトークンを取得
 config = Config()
 token = config.odpt_token
 
 def get_train_timetable():
     url= f"https://api.odpt.org/api/v4/odpt:TrainTimetable?odpt:operator=odpt.Operator:TokyoMetro&acl:consumerKey={token}"
-    print(f"Fetching train timetable from: {url}")
+    logger.info(f"Fetching train timetable from: {url}")
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -52,12 +57,12 @@ def get_train_timetable():
         
         return timetable
     except requests.RequestException as e:
-        print(f"Error fetching train timetable: {e}")
+        logger.error(f"Error fetching train timetable: {e}")
         return None
 
 def get_train_status():
     url=f"https://api.odpt.org/api/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:TokyoMetro&acl:consumerKey={token}"
-    print(f"Fetching train status from: {url}")
+    logger.info(f"Fetching train status from: {url}")
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -78,39 +83,39 @@ def get_train_status():
         
         return status_info
     except requests.RequestException as e:
-        print(f"Error fetching train status: {e}")
+        logger.error(f"Error fetching train status: {e}")
         return None
 
-def get_train_realtime_information():
-    url=f"https://api.odpt.org/api/v4/gtfs/realtime/tokyometro_odpt_train_alert?acl:consumerKey={token}"
-    print(f"Fetching train realtime information from: {url}")
+def get_fare_information():
+    url=f" https://api.odpt.org/api/v4/odpt:RailwayFare?odpt:operator=odpt.Operator:TokyoMetro&acl:consumerKey={token}"
+    logger.info(f"Fetching fare information from: {url}")
     try:
         response = requests.get(url)
         response.raise_for_status()
+        data = response.json()
         
-        feed = gtfs_realtime_pb2.FeedMessage()
-        feed.ParseFromString(response.content)
-        
-        alerts = []
-        for entity in feed.entity:
-            if entity.HasField('alert'):
-                alert_data = {
-                    "cause": entity.alert.cause,
-                    "effect": entity.alert.effect,
-                    "header_text": entity.alert.header_text.translation[0].text,
-                    "description_text": entity.alert.description_text.translation[0].text,
-                }
-                alerts.append(alert_data)
-        return alerts
+        fare_data = []
+        for fare_info in data:
+            info = {
+                "from_station": fare_info.get("odpt:fromStation"),
+                "to_station": fare_info.get("odpt:toStation"),
+                "ic_card_fare": fare_info.get("odpt:icCardFare"),
+                "ticket_fare": fare_info.get("odpt:ticketFare"),
+                "child_ic_card_fare": fare_info.get("odpt:childIcCardFare"),
+                "child_ticket_fare": fare_info.get("odpt:childTicketFare"),
+                "operator": fare_info.get("odpt:operator"),
+                "date": fare_info.get("dc:date"),
+                "issued": fare_info.get("dct:issued"),
+                "same_as": fare_info.get("owl:sameAs"),
+            }
+            fare_data.append(info)
+            
+        return fare_data
     except requests.RequestException as e:
-        print(f"Error fetching train realtime information: {e}")
+        logger.error(f"Error fetching fare information: {e}")
         return None
 
 if __name__ == "__main__":
-    statuses = get_train_status()
-    if statuses:
-        print(json.dumps(statuses, indent=2, ensure_ascii=False))
-    
-    realtime_info = get_train_realtime_information()
-    if realtime_info:
-        print(json.dumps(realtime_info, indent=2, ensure_ascii=False))
+    fare_info = get_fare_information()
+    if fare_info:
+        print(json.dumps(fare_info, indent=2, ensure_ascii=False))
