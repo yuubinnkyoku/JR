@@ -45,8 +45,33 @@ def get_train_timetable():
         print(f"Error fetching train timetable: {e}")
         return None
 
+def get_train_status():
+    url=f"https://api.odpt.org/api/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:TokyoMetro&acl:consumerKey={token}"
+    print(f"Fetching train status from: {url}")
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        
+        status_info = []
+        for info in data:
+            status_data = {
+                "date": info.get("dc:date"),
+                "valid": info.get("dct:valid"),
+                "same_as":info.get("owl:sameAs"),
+                "railway": info.get("odpt:railway"),
+                "operator": info.get("odpt:operator"),
+                "time_of_origin": info.get("odpt:timeOfOrigin"),
+                "status": info.get("odpt:trainInformationText", {}).get("ja")
+            }
+            status_info.append(status_data)
+        
+        return status_info
+    except requests.RequestException as e:
+        print(f"Error fetching train status: {e}")
+        return None
+
 if __name__ == "__main__":
-    timetables = get_train_timetable()
-    if timetables:
-        # 最初の5件だけ表示
-        print(json.dumps(timetables[:5], indent=2, ensure_ascii=False))
+    statuses = get_train_status()
+    if statuses:
+        print(json.dumps(statuses, indent=2, ensure_ascii=False))
