@@ -17,25 +17,34 @@ def get_train_timetable():
         timetable = []
         for train_info in data:
             train_data = {
-                "train_number": train_info.get("odpt:trainNumber"),
-                "train_type": train_info.get("odpt:trainType"),
+                "date": train_info.get("dc:date"),
+                "issued": train_info.get("dct:issued"),
+                "same_as": train_info.get("owl:sameAs"),
                 "railway": train_info.get("odpt:railway"),
+                "calendar": train_info.get("odpt:calendar"),
+                "operator": train_info.get("odpt:operator"),
+                "train_type": train_info.get("odpt:trainType"),
+                "train_number": train_info.get("odpt:trainNumber"),                
                 "origin_station": train_info.get("odpt:originStation"),
-                "destination_station": train_info.get("odpt:destinationStation"),
                 "direction": train_info.get("odpt:railDirection"),
-                "stops": []
+                "destination_station": train_info.get("odpt:destinationStation"),
+                "stops": [],
             }
             
             for stop_info in train_info.get("odpt:trainTimetableObject", []):
                 stop_data = {}
-                if "odpt:departureTime" in stop_info:
-                    stop_data["time"] = stop_info["odpt:departureTime"]
+                if "odpt:departureStation" in stop_info:
                     stop_data["station"] = stop_info["odpt:departureStation"]
-                elif "odpt:arrivalTime" in stop_info:
-                    stop_data["time"] = stop_info["odpt:arrivalTime"]
+                elif "odpt:arrivalStation" in stop_info:
                     stop_data["station"] = stop_info["odpt:arrivalStation"]
+
+                if "odpt:departureTime" in stop_info:
+                    stop_data["departure_time"] = stop_info["odpt:departureTime"]
                 
-                if stop_data:
+                if "odpt:arrivalTime" in stop_info:
+                    stop_data["arrival_time"] = stop_info["odpt:arrivalTime"]
+
+                if stop_data.get("station"):
                     train_data["stops"].append(stop_data)
             
             timetable.append(train_data)
