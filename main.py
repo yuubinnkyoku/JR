@@ -1,7 +1,6 @@
 import json
 import traceback
 from typing import Optional
-
 import discord
 import requests
 from discord.ext import commands
@@ -10,7 +9,7 @@ from requests.exceptions import RequestException
 from env.config import Config
 
 config = Config()
-token = config.token
+token = config.discord_token
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="/", intents=intents)
@@ -234,22 +233,5 @@ async def line_autocomplete(interaction: discord.Interaction, current: str):
         return choices
     except Exception:
         return []
-
-
-# 従来のUIベースのコマンドも残す
-@bot.tree.command(
-    name="jr_west_delay_ui", description="JR西日本の遅延情報をUIで取得します。"
-)
-async def jr_west_delay_ui(interaction: discord.Interaction):
-    try:
-        lines = await get_lines_data()
-        view = LineSelectView(lines)
-        await interaction.response.send_message(
-            "確認したい路線を選択してください。", view=view
-        )
-
-    except (RequestException, json.JSONDecodeError) as e:
-        await interaction.response.send_message(f"路線の取得に失敗しました: {e}")
-
 
 bot.run(token=token)
