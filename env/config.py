@@ -11,5 +11,9 @@ class Config:
         self.config.read(path, "UTF-8")
 
     @property
-    def token(self) -> str:
-        return str(self.config["TOKEN"]["TOKEN"])
+    def discord_token(self) -> str:
+        return str(self.config["DISCORD"]["TOKEN"])
+    
+    @property
+    def odpt_token(self) -> str:
+        return str(self.config["ODPT"]["TOKEN"])
