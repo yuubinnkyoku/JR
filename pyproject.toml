@@ -8,4 +8,11 @@ dependencies = [
     "certifi>=2025.6.15",
     "discord>=2.3.2",
     "requests>=2.32.4",
+    "gtfs-realtime-bindings>=0.0.7",
 ]
+
+[tool.uv]
+dev-dependencies = []
+
+[tool.uv.sources]
+TokyoMetro = { workspace = true }

@@ -2,6 +2,7 @@ import requests
 import json
 from typing import Optional
 from env.config import Config
+from google.transit import gtfs_realtime_pb2
 
 config = Config()
 token = config.odpt_token
@@ -80,7 +81,36 @@ def get_train_status():
         print(f"Error fetching train status: {e}")
         return None
 
+def get_train_realtime_information():
+    url=f"https://api.odpt.org/api/v4/gtfs/realtime/tokyometro_odpt_train_alert?acl:consumerKey={token}"
+    print(f"Fetching train realtime information from: {url}")
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        
+        feed = gtfs_realtime_pb2.FeedMessage()
+        feed.ParseFromString(response.content)
+        
+        alerts = []
+        for entity in feed.entity:
+            if entity.HasField('alert'):
+                alert_data = {
+                    "cause": entity.alert.cause,
+                    "effect": entity.alert.effect,
+                    "header_text": entity.alert.header_text.translation[0].text,
+                    "description_text": entity.alert.description_text.translation[0].text,
+                }
+                alerts.append(alert_data)
+        return alerts
+    except requests.RequestException as e:
+        print(f"Error fetching train realtime information: {e}")
+        return None
+
 if __name__ == "__main__":
     statuses = get_train_status()
     if statuses:
         print(json.dumps(statuses, indent=2, ensure_ascii=False))
+    
+    realtime_info = get_train_realtime_information()
+    if realtime_info:
+        print(json.dumps(realtime_info, indent=2, ensure_ascii=False))
