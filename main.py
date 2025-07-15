@@ -1,8 +1,6 @@
 import traceback
-
 import discord
 from discord.ext import commands
-
 from env.config import Config
 
 INITIAL_EXTENSIONS = [
