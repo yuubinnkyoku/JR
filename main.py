@@ -4,7 +4,7 @@ from discord.ext import commands
 from env.config import Config
 
 INITIAL_EXTENSIONS = [
-"cogs.TokyoMetro",
+"cogs.fare_info",
 "cogs.JR_West",
 ]
 
