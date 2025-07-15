@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from cogs.TokyoMetro import get_fare_information
+from API.TokyoMetro import get_fare_information
 import logging
 
 # ロガーの設定
