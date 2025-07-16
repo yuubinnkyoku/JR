@@ -154,5 +154,3 @@ def get_station_information():
         logger.error(f"Error fetching station information: {e}")
         return None
 
-
-station_info = get_station_information()
