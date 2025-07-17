@@ -1,36 +1,6 @@
 import discord
-from discord import ap    def get_station_id_from_name(self, station_name: str) -> str:
-        """駅名から駅IDを取得（運賃API用のIDに変換）"""
-        station_ids = []
-        for station in self.stations:
-            if (station.get("station_title") and 
-                station.get("station_title").get("ja") == station_name):
-                # same_asから運賃API用のIDを取得
-                same_as = station.get("same_as")
-                if same_as:
-                    station_ids.append(same_as)
-            elif station.get("title") == station_name:
-                same_as = station.get("same_as")
-                if same_as:
-                    station_ids.append(same_as)
-        
-        # 複数の路線に同じ駅名がある場合は、最初のIDを返す
-        return station_ids[0] if station_ids else ""
-    
-    def get_all_station_ids_from_name(self, station_name: str) -> list:
-        """駅名から全ての駅IDを取得（複数路線対応）"""
-        station_ids = []
-        for station in self.stations:
-            if (station.get("station_title") and 
-                station.get("station_title").get("ja") == station_name):
-                same_as = station.get("same_as")
-                if same_as:
-                    station_ids.append(same_as)
-            elif station.get("title") == station_name:
-                same_as = station.get("same_as")
-                if same_as:
-                    station_ids.append(same_as)
-        return station_idsdiscord.ext import commands
+from discord import app_commands
+from discord.ext import commands
 from API.TokyoMetro import get_fare_information, get_station_information
 import logging
 
@@ -81,6 +51,21 @@ class FareInfo(commands.Cog):
                     return same_as
                 return station.get("id", "")
         return ""
+    
+    def get_all_station_ids_from_name(self, station_name: str) -> list:
+        """駅名から全ての駅IDを取得（複数路線対応）"""
+        station_ids = []
+        for station in self.stations:
+            if (station.get("station_title") and 
+                station.get("station_title").get("ja") == station_name):
+                same_as = station.get("same_as")
+                if same_as:
+                    station_ids.append(same_as)
+            elif station.get("title") == station_name:
+                same_as = station.get("same_as")
+                if same_as:
+                    station_ids.append(same_as)
+        return station_ids
 
     async def station_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
         """駅名のオートコンプリート"""
