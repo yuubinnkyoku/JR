@@ -133,9 +133,11 @@ class FareInfo(commands.Cog):
                 # 駅IDから駅名へのマップ作成
                 name_map = {}
                 for station in self.stations:
-                    sid = station.get("owl:sameAs") or station.get("id")
+                    # same_asキーから駅IDを取得
+                    sid = station.get("same_as") or station.get("id")
                     name = station.get("station_title", {}).get("ja") or station.get("title")
-                    name_map[sid] = name
+                    if sid:
+                        name_map[sid] = name
                 # グラフ構築: {駅ID: [(隣駅ID, costs), ...]}
                 graph = {}
                 for fare in all_fares:
