@@ -93,7 +93,7 @@ def get_train_status():
         return None
 
 def get_fare_information():
-    url=f" https://api.odpt.org/api/v4/odpt:RailwayFare?odpt:operator=odpt.Operator:TokyoMetro&acl:consumerKey={token}"
+    url=f"https://api.odpt.org/api/v4/odpt:RailwayFare?odpt:operator=odpt.Operator:TokyoMetro&acl:consumerKey={token}"
     logger.info(f"Fetching fare information from: {url}")
     try:
         response = requests.get(url)
