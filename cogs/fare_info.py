@@ -1,6 +1,36 @@
 import discord
-from discord import app_commands
-from discord.ext import commands
+from discord import ap    def get_station_id_from_name(self, station_name: str) -> str:
+        """駅名から駅IDを取得（運賃API用のIDに変換）"""
+        station_ids = []
+        for station in self.stations:
+            if (station.get("station_title") and 
+                station.get("station_title").get("ja") == station_name):
+                # same_asから運賃API用のIDを取得
+                same_as = station.get("same_as")
+                if same_as:
+                    station_ids.append(same_as)
+            elif station.get("title") == station_name:
+                same_as = station.get("same_as")
+                if same_as:
+                    station_ids.append(same_as)
+        
+        # 複数の路線に同じ駅名がある場合は、最初のIDを返す
+        return station_ids[0] if station_ids else ""
+    
+    def get_all_station_ids_from_name(self, station_name: str) -> list:
+        """駅名から全ての駅IDを取得（複数路線対応）"""
+        station_ids = []
+        for station in self.stations:
+            if (station.get("station_title") and 
+                station.get("station_title").get("ja") == station_name):
+                same_as = station.get("same_as")
+                if same_as:
+                    station_ids.append(same_as)
+            elif station.get("title") == station_name:
+                same_as = station.get("same_as")
+                if same_as:
+                    station_ids.append(same_as)
+        return station_idsdiscord.ext import commands
 from API.TokyoMetro import get_fare_information, get_station_information
 import logging
 
@@ -36,12 +66,19 @@ class FareInfo(commands.Cog):
             logger.error(f"駅情報読み込み中にエラーが発生しました: {e}")
 
     def get_station_id_from_name(self, station_name: str) -> str:
-        """駅名から駅IDを取得"""
+        """駅名から駅IDを取得（運賃API用のIDに変換）"""
         for station in self.stations:
             if (station.get("station_title") and 
                 station.get("station_title").get("ja") == station_name):
+                # same_asから運賃API用のIDを取得
+                same_as = station.get("owl:sameAs")
+                if same_as:
+                    return same_as
                 return station.get("id", "")
             elif station.get("title") == station_name:
+                same_as = station.get("owl:sameAs")
+                if same_as:
+                    return same_as
                 return station.get("id", "")
         return ""
 
@@ -66,11 +103,11 @@ class FareInfo(commands.Cog):
         await interaction.response.send_message(f"`{from_station}`駅から`{to_station}`駅までの運賃を検索しています...", ephemeral=True)
         
         try:
-            # 駅名から駅IDを取得
-            from_station_id = self.get_station_id_from_name(from_station)
-            to_station_id = self.get_station_id_from_name(to_station)
+            # 駅名から全ての駅IDを取得
+            from_station_ids = self.get_all_station_ids_from_name(from_station)
+            to_station_ids = self.get_all_station_ids_from_name(to_station)
             
-            if not from_station_id or not to_station_id:
+            if not from_station_ids or not to_station_ids:
                 await interaction.followup.send("指定された駅名が見つかりませんでした。駅名を正しく選択してください。")
                 return
 
@@ -79,12 +116,18 @@ class FareInfo(commands.Cog):
                 await interaction.followup.send("運賃情報を取得できませんでした。")
                 return
 
+            # 全ての組み合わせで運賃情報を検索
             found_fare = None
-            for fare in all_fares:
-                # 駅IDで正確に検索
-                if ((fare["from_station"] == from_station_id and fare["to_station"] == to_station_id) or
-                    (fare["from_station"] == to_station_id and fare["to_station"] == from_station_id)):
-                    found_fare = fare
+            for from_id in from_station_ids:
+                for to_id in to_station_ids:
+                    for fare in all_fares:
+                        if ((fare["from_station"] == from_id and fare["to_station"] == to_id) or
+                            (fare["from_station"] == to_id and fare["to_station"] == from_id)):
+                            found_fare = fare
+                            break
+                    if found_fare:
+                        break
+                if found_fare:
                     break
             
             if found_fare:
@@ -100,7 +143,38 @@ class FareInfo(commands.Cog):
                 
                 await interaction.followup.send(embed=embed)
             else:
-                await interaction.followup.send(f"`{from_station}`駅から`{to_station}`駅への運賃情報が見つかりませんでした。")
+                # 同じ路線かどうかを確認
+                from_station_info = None
+                to_station_info = None
+                
+                for station in self.stations:
+                    if station.get("same_as") in from_station_ids:
+                        from_station_info = station
+                    if station.get("same_as") in to_station_ids:
+                        to_station_info = station
+                
+                # 同じ路線の駅があるかチェック
+                same_railway = False
+                if from_station_info and to_station_info:
+                    for from_station_data in self.stations:
+                        if from_station_data.get("same_as") in from_station_ids:
+                            for to_station_data in self.stations:
+                                if (to_station_data.get("same_as") in to_station_ids and
+                                    from_station_data.get("railway") == to_station_data.get("railway")):
+                                    same_railway = True
+                                    railway_name = from_station_data.get("railway", "").replace("odpt.Railway:TokyoMetro.", "")
+                                    break
+                            if same_railway:
+                                break
+                
+                if same_railway:
+                    await interaction.followup.send(
+                        f"`{from_station}`駅と`{to_station}`駅は同じ{railway_name}線内の駅です。\n"
+                        f"同じ路線内の運賃情報は東京メトロオープンデータAPIでは提供されていません。\n"
+                        f"詳細な運賃については東京メトロ公式サイトをご確認ください。"
+                    )
+                else:
+                    await interaction.followup.send(f"`{from_station}`駅から`{to_station}`駅への運賃情報が見つかりませんでした。")
 
         except Exception as e:
             logger.error(f"運賃検索中にエラーが発生しました: {e}")
