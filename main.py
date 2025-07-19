@@ -6,6 +6,7 @@ from env.config import Config
 INITIAL_EXTENSIONS = [
 "cogs.fare_info",
 "cogs.JR_West",
+"cogs.delay_monitor",
 ]
 
 config = Config()
