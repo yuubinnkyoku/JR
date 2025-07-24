@@ -67,39 +67,125 @@ class FareInfo(commands.Cog):
                     station_ids.append(same_as)
         return station_ids
 
-    async def station_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-        """駅名のオートコンプリート"""
-        # 現在の入力に基づいて駅名を絞り込み
-        if current:
-            matches = [station for station in self.station_names if current.lower() in station.lower()]
-        else:
-            matches = self.station_names[:25]  # 最大25個まで表示
+    def find_stations_by_name(self, input_name: str) -> list:
+        """入力された駅名から候補駅を検索（部分一致・曖昧検索対応）"""
+        matches = []
+        input_lower = input_name.lower().replace(" ", "").replace("　", "")
         
-        return [
-            app_commands.Choice(name=station, value=station)
-            for station in matches[:25]  # Discordの制限により25個まで
-        ]
+        for station in self.stations:
+            station_name = ""
+            if station.get("station_title") and station.get("station_title").get("ja"):
+                station_name = station.get("station_title").get("ja")
+            elif station.get("title"):
+                station_name = station.get("title")
+            
+            if station_name:
+                station_lower = station_name.lower().replace(" ", "").replace("　", "")
+                same_as = station.get("same_as")
+                
+                # 完全一致
+                if station_lower == input_lower:
+                    matches.append({
+                        "name": station_name,
+                        "id": same_as,
+                        "priority": 1
+                    })
+                # 前方一致
+                elif station_lower.startswith(input_lower):
+                    matches.append({
+                        "name": station_name,
+                        "id": same_as,
+                        "priority": 2
+                    })
+                # 部分一致
+                elif input_lower in station_lower:
+                    matches.append({
+                        "name": station_name,
+                        "id": same_as,
+                        "priority": 3
+                    })
+        
+        # 優先度でソートし、重複を除去
+        seen_names = set()
+        unique_matches = []
+        for match in sorted(matches, key=lambda x: (x["priority"], x["name"])):
+            if match["name"] not in seen_names:
+                seen_names.add(match["name"])
+                unique_matches.append(match)
+        
+        return unique_matches[:10]  # 最大10件まで返す
 
     @app_commands.command(name="fare", description="東京メトロの駅間の運賃を検索します。")
-    @app_commands.describe(from_station="出発駅", to_station="到着駅")
-    @app_commands.autocomplete(from_station=station_autocomplete, to_station=station_autocomplete)
+    @app_commands.describe(from_station="出発駅（駅名を入力してください）", to_station="到着駅（駅名を入力してください）")
     async def fare(self, interaction: discord.Interaction, from_station: str, to_station: str):
         """指定された2駅間の運賃情報を表示します。"""
         await interaction.response.send_message(f"`{from_station}`駅から`{to_station}`駅までの運賃を検索しています...", ephemeral=True)
         
         try:
-            # 駅名から全ての駅IDを取得
-            from_station_ids = self.get_all_station_ids_from_name(from_station)
-            to_station_ids = self.get_all_station_ids_from_name(to_station)
+            # 入力された駅名から候補を検索
+            from_candidates = self.find_stations_by_name(from_station)
+            to_candidates = self.find_stations_by_name(to_station)
             
-            if not from_station_ids or not to_station_ids:
-                await interaction.followup.send("指定された駅名が見つかりませんでした。駅名を正しく選択してください。")
+            if not from_candidates:
+                embed = discord.Embed(
+                    title="駅が見つかりません",
+                    description=f"`{from_station}`に該当する駅が見つかりませんでした。",
+                    color=discord.Color.red()
+                )
+                embed.add_field(
+                    name="ヒント",
+                    value="• 駅名の一部だけでも検索できます\n• ひらがな、カタカナ、漢字で入力してください\n• 例: `新宿`, `しんじゅく`, `シンジュク`",
+                    inline=False
+                )
+                await interaction.followup.send(embed=embed)
                 return
+            
+            if not to_candidates:
+                embed = discord.Embed(
+                    title="駅が見つかりません",
+                    description=f"`{to_station}`に該当する駅が見つかりませんでした。",
+                    color=discord.Color.red()
+                )
+                embed.add_field(
+                    name="ヒント",
+                    value="• 駅名の一部だけでも検索できます\n• ひらがな、カタカナ、漢字で入力してください\n• 例: `新宿`, `しんじゅく`, `シンジュク`",
+                    inline=False
+                )
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # 複数候補がある場合は最初の候補を使用し、候補リストも表示
+            selected_from = from_candidates[0]
+            selected_to = to_candidates[0]
+            
+            # 候補が複数ある場合の情報表示用
+            from_info = f"`{selected_from['name']}`"
+            if len(from_candidates) > 1:
+                other_from = [c['name'] for c in from_candidates[1:6]]  # 最大5つまで表示
+                from_info += f"\n（他の候補: {', '.join(other_from)}{'...' if len(from_candidates) > 6 else ''}）"
+            
+            to_info = f"`{selected_to['name']}`"
+            if len(to_candidates) > 1:
+                other_to = [c['name'] for c in to_candidates[1:6]]  # 最大5つまで表示
+                to_info += f"\n（他の候補: {', '.join(other_to)}{'...' if len(to_candidates) > 6 else ''}）"
 
+            # 運賃情報を取得
             all_fares = get_fare_information()
             if not all_fares:
                 await interaction.followup.send("運賃情報を取得できませんでした。")
                 return
+
+            # 選択された駅のIDを使用して運賃情報を検索
+            from_station_ids = [selected_from['id']] if selected_from['id'] else []
+            to_station_ids = [selected_to['id']] if selected_to['id'] else []
+            
+            # 他の候補駅のIDも追加
+            for candidate in from_candidates[1:]:
+                if candidate['id'] and candidate['id'] not in from_station_ids:
+                    from_station_ids.append(candidate['id'])
+            for candidate in to_candidates[1:]:
+                if candidate['id'] and candidate['id'] not in to_station_ids:
+                    to_station_ids.append(candidate['id'])
 
             # 全ての組み合わせで運賃情報を検索
             found_fare = None
@@ -117,15 +203,25 @@ class FareInfo(commands.Cog):
             
             if found_fare:
                 embed = discord.Embed(
-                    title=f"{from_station}駅 ⇔ {to_station}駅 の運賃",
+                    title=f"{selected_from['name']}駅 ⇔ {selected_to['name']}駅 の運賃",
                     color=discord.Color.blue()
                 )
                 embed.add_field(name="ICカード運賃", value=f"{found_fare['ic_card_fare']}円", inline=True)
                 embed.add_field(name="切符運賃", value=f"{found_fare['ticket_fare']}円", inline=True)
                 embed.add_field(name="こどもICカード運賃", value=f"{found_fare['child_ic_card_fare']}円", inline=True)
                 embed.add_field(name="こども切符運賃", value=f"{found_fare['child_ticket_fare']}円", inline=True)
-                embed.set_footer(text="情報提供: 東京メトロオープンデータ")
                 
+                # 候補が複数ある場合の情報を表示
+                if len(from_candidates) > 1 or len(to_candidates) > 1:
+                    candidate_info = ""
+                    if len(from_candidates) > 1:
+                        candidate_info += f"**出発駅**: {from_info}\n"
+                    if len(to_candidates) > 1:
+                        candidate_info += f"**到着駅**: {to_info}\n"
+                    if candidate_info:
+                        embed.add_field(name="検索結果", value=candidate_info, inline=False)
+                
+                embed.set_footer(text="情報提供: 東京メトロオープンデータ")
                 await interaction.followup.send(embed=embed)
             else:
                 # 直通運賃がない場合、複数区間の運賃と経路を計算
@@ -192,7 +288,7 @@ class FareInfo(commands.Cog):
                     route_names = [name_map.get(s, s) for s in path]
                     route_str = " → ".join(route_names)
                     embed = discord.Embed(
-                        title=f"{from_station}駅 ⇔ {to_station}駅 の運賃 (経路表示)",
+                        title=f"{selected_from['name']}駅 ⇔ {selected_to['name']}駅 の運賃 (経路表示)",
                         color=discord.Color.green()
                     )
                     embed.add_field(name="経路", value=route_str, inline=False)
@@ -200,6 +296,17 @@ class FareInfo(commands.Cog):
                     embed.add_field(name="切符運賃", value=f"{ticket}円", inline=True)
                     embed.add_field(name="こどもICカード運賃", value=f"{child_ic}円", inline=True)
                     embed.add_field(name="こども切符運賃", value=f"{child_ticket}円", inline=True)
+                    
+                    # 候補が複数ある場合の情報を表示
+                    if len(from_candidates) > 1 or len(to_candidates) > 1:
+                        candidate_info = ""
+                        if len(from_candidates) > 1:
+                            candidate_info += f"**出発駅**: {from_info}\n"
+                        if len(to_candidates) > 1:
+                            candidate_info += f"**到着駅**: {to_info}\n"
+                        if candidate_info:
+                            embed.add_field(name="検索結果", value=candidate_info, inline=False)
+                    
                     embed.set_footer(text="最短ICカード運賃の経路を合算しています")
                     await interaction.followup.send(embed=embed)
                     return
@@ -230,16 +337,37 @@ class FareInfo(commands.Cog):
                 
                 if same_railway:
                     await interaction.followup.send(
-                        f"`{from_station}`駅と`{to_station}`駅は同じ{railway_name}線内の駅です。\n"
+                        f"`{selected_from['name']}`駅と`{selected_to['name']}`駅は同じ{railway_name}線内の駅です。\n"
                         f"同じ路線内の運賃情報は東京メトロオープンデータAPIでは提供されていません。\n"
                         f"詳細な運賃については東京メトロ公式サイトをご確認ください。"
                     )
                 else:
-                    await interaction.followup.send(f"`{from_station}`駅から`{to_station}`駅への運賃情報が見つかりませんでした。")
+                    embed = discord.Embed(
+                        title="運賃情報が見つかりません",
+                        description=f"`{selected_from['name']}`駅から`{selected_to['name']}`駅への運賃情報が見つかりませんでした。",
+                        color=discord.Color.orange()
+                    )
+                    
+                    # 候補が複数ある場合の情報を表示
+                    if len(from_candidates) > 1 or len(to_candidates) > 1:
+                        candidate_info = ""
+                        if len(from_candidates) > 1:
+                            candidate_info += f"**出発駅の候補**: {', '.join([c['name'] for c in from_candidates[:5]])}\n"
+                        if len(to_candidates) > 1:
+                            candidate_info += f"**到着駅の候補**: {', '.join([c['name'] for c in to_candidates[:5]])}\n"
+                        if candidate_info:
+                            embed.add_field(name="他の候補駅", value=candidate_info, inline=False)
+                    
+                    await interaction.followup.send(embed=embed)
 
         except Exception as e:
             logger.error(f"運賃検索中にエラーが発生しました: {e}")
-            await interaction.followup.send("運賃の検索中にエラーが発生しました。")
+            embed = discord.Embed(
+                title="エラーが発生しました",
+                description="運賃の検索中にエラーが発生しました。しばらく時間をおいて再度お試しください。",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(FareInfo(bot))
